@@ -1,0 +1,1396 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AutoVende — Carros à venda (ADM + Mapa + Parcelamento)</title>
+
+  <!-- Leaflet (Mapa) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    :root{
+      --bg:#0b1020; --card:#0f1733; --muted:#9aa4c3; --text:#e9eeff;
+      --brand:#4f7cff; --ok:#22c55e; --danger:#ef4444; --line:rgba(255,255,255,.10);
+      --shadow:0 20px 60px rgba(0,0,0,.35); --radius:18px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      background:
+        radial-gradient(1000px 500px at 20% 0%, rgba(79,124,255,.18), transparent 55%),
+        radial-gradient(900px 600px at 80% 10%, rgba(34,197,94,.10), transparent 60%),
+        linear-gradient(180deg, #070a14, #0b1020 25%, #070a14);
+      color:var(--text);
+    }
+    a{color:inherit;text-decoration:none}
+    .container{max-width:1180px;margin:0 auto;padding:22px}
+    header{
+      position:sticky;top:0;z-index:10;
+      backdrop-filter: blur(14px);
+      background: linear-gradient(180deg, rgba(7,10,20,.85), rgba(7,10,20,.55));
+      border-bottom:1px solid var(--line);
+    }
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 22px;max-width:1180px;margin:0 auto;}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:900}
+    .logo{width:40px;height:40px;border-radius:14px;background:conic-gradient(from 210deg,var(--brand),rgba(79,124,255,.15),rgba(34,197,94,.18),var(--brand));border:1px solid rgba(255,255,255,.12);box-shadow:0 10px 30px rgba(79,124,255,.18)}
+    .badge{font-size:12px;color:var(--muted);padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.04)}
+    .cta{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .btn{
+      border:none; cursor:pointer;
+      padding:10px 14px; border-radius:999px; font-weight:800;
+      background:rgba(255,255,255,.06); color:var(--text); border:1px solid var(--line);
+      transition:.15s transform,.15s background,.15s border-color;
+    }
+    .btn:hover{transform:translateY(-1px);background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.18)}
+    .btn.primary{background:linear-gradient(135deg, rgba(79,124,255,.95), rgba(79,124,255,.65));border-color:rgba(79,124,255,.35);box-shadow:0 18px 45px rgba(79,124,255,.20)}
+    .btn.ok{background:rgba(34,197,94,.14);border-color:rgba(34,197,94,.25)}
+    .btn.danger{background:rgba(239,68,68,.14);border-color:rgba(239,68,68,.25)}
+    .btn.small{padding:9px 12px}
+    .hero{padding:22px 0 8px;display:grid;grid-template-columns: 1.25fr .75fr;gap:18px}
+    @media (max-width: 920px){ .hero{grid-template-columns:1fr} }
+    .heroCard{background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+    h1{margin:0 0 8px;font-size:28px;line-height:1.15}
+    p{margin:0;color:var(--muted);line-height:1.55}
+    .filters{display:grid;grid-template-columns: 1.3fr .7fr .7fr .7fr .7fr;gap:10px;margin-top:14px}
+    @media (max-width: 920px){ .filters{grid-template-columns:1fr 1fr} .filters .full{grid-column:1 / -1} }
+    .field{display:flex;flex-direction:column;gap:7px}
+    label{font-size:12px;color:var(--muted)}
+    input, select, textarea{
+      background:rgba(0,0,0,.22); color:var(--text);
+      border:1px solid var(--line); border-radius:14px; padding:10px 12px; outline:none;
+    }
+    textarea{min-height:110px;resize:vertical}
+    input:focus, select:focus, textarea:focus{border-color:rgba(79,124,255,.5); box-shadow:0 0 0 3px rgba(79,124,255,.18)}
+    .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+    .stat{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:var(--radius);padding:14px}
+    .stat .k{font-size:12px;color:var(--muted)}
+    .stat .v{font-size:18px;font-weight:900;margin-top:6px}
+    .grid{margin-top:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+    @media (max-width: 980px){ .grid{grid-template-columns:repeat(2,1fr)} }
+    @media (max-width: 620px){ .grid{grid-template-columns:1fr} }
+    .card{background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));border:1px solid var(--line);border-radius:24px;overflow:hidden;box-shadow:0 18px 55px rgba(0,0,0,.30);transition:.18s transform,.18s border-color;display:flex;flex-direction:column}
+    .card:hover{transform:translateY(-3px);border-color:rgba(255,255,255,.18)}
+    .thumb{height:170px;background:rgba(0,0,0,.25);display:flex;align-items:flex-end;justify-content:space-between;padding:14px;gap:10px;background-size:cover;background-position:center}
+    .pill{font-size:12px;font-weight:900;padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:rgba(0,0,0,.20)}
+    .cardBody{padding:14px 14px 16px;display:flex;flex-direction:column;gap:10px}
+    .titleRow{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+    .title{font-weight:900;font-size:16px;line-height:1.2}
+    .price{font-weight:900;font-size:16px}
+    .meta{display:flex;flex-wrap:wrap;gap:8px;color:var(--muted);font-size:12px}
+    .chip{padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+    .cardActions{display:flex;gap:10px;margin-top:2px;flex-wrap:wrap}
+    .empty{margin:18px 0;border:1px dashed rgba(255,255,255,.20);border-radius:24px;padding:18px;color:var(--muted);background:rgba(255,255,255,.03)}
+    footer{color:var(--muted);font-size:12px;padding:22px 0 40px}
+    /* Modal */
+    .modalOverlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;padding:18px;z-index:50}
+    .modalOverlay.show{display:flex}
+    .modal{width:min(980px,100%);border-radius:24px;border:1px solid rgba(255,255,255,.14);background:linear-gradient(180deg, rgba(15,23,51,.98), rgba(9,12,26,.98));box-shadow:0 30px 90px rgba(0,0,0,.55);overflow:hidden}
+    .modalTop{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+    .x{width:40px;height:40px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.04);cursor:pointer;font-weight:900;color:var(--text)}
+    .modalGrid{display:grid;grid-template-columns:1.2fr .8fr;gap:0}
+    @media (max-width: 920px){ .modalGrid{grid-template-columns:1fr} }
+    .gallery{padding:16px;border-right:1px solid var(--line)}
+    @media (max-width: 920px){ .gallery{border-right:none;border-bottom:1px solid var(--line)} }
+    .bigPic{
+      height:300px;border-radius:18px;border:1px solid rgba(255,255,255,.12);
+      background:rgba(0,0,0,.25);display:flex;align-items:flex-end;justify-content:space-between;padding:14px;overflow:hidden;
+      background-size:cover;background-position:center;
+    }
+    .tag{font-size:12px;font-weight:900;padding:7px 11px;border-radius:999px;background:rgba(0,0,0,.22);border:1px solid var(--line)}
+    .thumbRow{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+    .mini{
+      width:110px;height:70px;border-radius:14px;border:1px solid rgba(255,255,255,.12);
+      background:rgba(0,0,0,.22);cursor:pointer;overflow:hidden;
+      background-size:cover;background-position:center;
+    }
+    .mini.active{border-color:rgba(79,124,255,.55); box-shadow:0 0 0 3px rgba(79,124,255,.18)}
+    .details{padding:16px}
+    .priceBig{font-size:24px;font-weight:1000;margin:2px 0 8px}
+    .kv{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+    .kv .item{border:1px solid var(--line);background:rgba(255,255,255,.03);border-radius:16px;padding:10px}
+    .kv .k{font-size:12px;color:var(--muted)}
+    .kv .v{font-weight:900;margin-top:5px}
+    .desc{margin-top:12px;border:1px solid var(--line);background:rgba(255,255,255,.03);border-radius:16px;padding:12px;color:var(--muted);line-height:1.6;font-size:13px}
+    /* Admin */
+    .adminWrap{margin-top:14px}
+    .adminBox{border:1px solid var(--line);background:rgba(255,255,255,.03);border-radius:24px;padding:16px}
+    .adminGrid{display:grid;grid-template-columns: 1fr 1fr;gap:12px}
+    @media (max-width: 920px){ .adminGrid{grid-template-columns:1fr} }
+    .adminRow{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+    .adminList{margin-top:14px;display:grid;gap:10px}
+    .adminItem{border:1px solid var(--line);background:rgba(0,0,0,.20);border-radius:18px;padding:12px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+    .smallmuted{font-size:12px;color:var(--muted)}
+    .divider{height:1px;background:var(--line);margin:14px 0}
+    .hide{display:none !important}
+    .previewRow{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .previewImg{width:78px;height:52px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);background-size:cover;background-position:center}
+    /* Map */
+    #map { height: 280px; border-radius:16px; border:1px solid rgba(255,255,255,.12); overflow:hidden; }
+    .hint{font-size:12px;color:var(--muted)}
+  </style>
+</head>
+
+<body>
+<header>
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <span>AutoVende</span>
+          <span class="badge">ADM • Mapa • Parcelamento</span>
+        </div>
+        <span class="smallmuted">Anúncios e fotos salvos no seu navegador (LocalStorage)</span>
+      </div>
+    </div>
+
+    <div class="cta">
+      <button class="btn" id="btnGoAdmin">Área ADM</button>
+      <button class="btn" id="btnReset">Limpar filtros</button>
+      <button class="btn primary" id="btnWhats">Anunciar no WhatsApp</button>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+  <section class="hero">
+    <div class="heroCard">
+      <h1>Carros à venda</h1>
+      <p>Busque e filtre. Clique em “Detalhes” para ver fotos, localização e parcelamento (se disponível).</p>
+
+      <div class="filters" style="margin-top:16px">
+        <div class="field full">
+          <label for="q">Buscar</label>
+          <input id="q" type="search" placeholder="Ex.: Fiesta, Onix, 2019, Ribeirão..." />
+        </div>
+
+        <div class="field">
+          <label for="brand">Marca</label>
+          <select id="brand"><option value="">Todas</option></select>
+        </div>
+
+        <div class="field">
+          <label for="yearMin">Ano mín.</label>
+          <select id="yearMin"><option value="">—</option></select>
+        </div>
+
+        <div class="field">
+          <label for="yearMax">Ano máx.</label>
+          <select id="yearMax"><option value="">—</option></select>
+        </div>
+
+        <div class="field">
+          <label for="priceMax">Preço máx.</label>
+          <select id="priceMax">
+            <option value="">Sem limite</option>
+            <option value="20000">Até R$ 20.000</option>
+            <option value="30000">Até R$ 30.000</option>
+            <option value="40000">Até R$ 40.000</option>
+            <option value="60000">Até R$ 60.000</option>
+            <option value="80000">Até R$ 80.000</option>
+            <option value="100000">Até R$ 100.000</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="sort">Ordenar</label>
+          <select id="sort">
+            <option value="newest">Mais novos</option>
+            <option value="oldest">Mais antigos</option>
+            <option value="lowprice">Menor preço</option>
+            <option value="highprice">Maior preço</option>
+            <option value="lowkm">Menor KM</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="heroCard">
+      <div class="stats">
+        <div class="stat"><div class="k">Anúncios encontrados</div><div class="v" id="statCount">0</div></div>
+        <div class="stat"><div class="k">Preço médio</div><div class="v" id="statAvg">—</div></div>
+        <div class="stat"><div class="k">Menor preço</div><div class="v" id="statMin">—</div></div>
+        <div class="stat"><div class="k">Maior preço</div><div class="v" id="statMax">—</div></div>
+      </div>
+      <div class="smallmuted" style="margin-top:10px">
+        Dica: no ADM você pode “Editar” anúncios e usar mapa para preencher localização.
+      </div>
+    </div>
+  </section>
+
+  <!-- ADMIN -->
+  <section class="adminWrap hide" id="adminWrap">
+    <div class="adminBox">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:1000;font-size:18px">Área ADM</div>
+          <div class="smallmuted">Cadastrar, editar, excluir anúncios. Fotos + mapa + parcelamento.</div>
+        </div>
+        <div class="adminRow">
+          <button class="btn" id="btnExitAdmin">Voltar</button>
+          <button class="btn danger" id="btnLogout">Sair</button>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Login -->
+      <div id="loginBox" class="adminBox" style="background:rgba(0,0,0,.18)">
+        <div style="font-weight:900">Login</div>
+        <div class="smallmuted">Troque a senha no código (ADMIN_PASSWORD).</div>
+        <div class="adminRow" style="margin-top:10px">
+          <input id="admPass" type="password" placeholder="Digite a senha do ADM" style="flex:1;min-width:220px" />
+          <button class="btn primary" id="btnLogin">Entrar</button>
+        </div>
+        <div class="smallmuted" id="loginMsg" style="margin-top:8px"></div>
+      </div>
+
+      <!-- Form -->
+      <div id="formBox" class="hide">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <div style="font-weight:900">Cadastrar / Editar anúncio</div>
+          <div class="adminRow">
+            <button class="btn" id="btnNew">Novo anúncio</button>
+            <button class="btn ok" id="btnSave">Salvar</button>
+          </div>
+        </div>
+
+        <div class="adminGrid" style="margin-top:12px">
+          <div class="field">
+            <label>Título (modelo/versão)</label>
+            <input id="fTitle" placeholder="Ex.: Fiesta 1.0 Flex" />
+          </div>
+          <div class="field">
+            <label>Marca</label>
+            <input id="fBrand" placeholder="Ex.: Ford" />
+          </div>
+
+          <div class="field">
+            <label>Ano</label>
+            <select id="fYear"></select>
+          </div>
+          <div class="field">
+            <label>Preço (R$)</label>
+            <input id="fPrice" type="number" min="0" step="1" placeholder="Ex.: 45990" />
+          </div>
+
+          <div class="field">
+            <label>KM</label>
+            <input id="fKm" type="number" min="0" step="1" placeholder="Ex.: 89000" />
+          </div>
+          <div class="field">
+            <label>Cidade (texto)</label>
+            <input id="fCity" placeholder="Ex.: Ribeirão Preto - SP" />
+          </div>
+
+          <div class="field">
+            <label>Câmbio</label>
+            <select id="fGear">
+              <option>Manual</option>
+              <option>Automático</option>
+              <option>CVT</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Combustível</label>
+            <select id="fFuel">
+              <option>Flex</option>
+              <option>Gasolina</option>
+              <option>Etanol</option>
+              <option>Diesel</option>
+              <option>Híbrido</option>
+              <option>Elétrico</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Cor</label>
+            <input id="fColor" placeholder="Ex.: Prata" />
+          </div>
+          <div class="field">
+            <label>Destaque</label>
+            <input id="fHighlight" placeholder="Ex.: Completo / Oportunidade" />
+          </div>
+
+          <div class="field">
+            <label>Nome do contato</label>
+            <input id="fContact" placeholder="Ex.: Eliésio" />
+          </div>
+          <div class="field">
+            <label>Telefone/Whats (texto livre)</label>
+            <input id="fPhone" placeholder="Ex.: (16) 99999-9999" />
+          </div>
+
+          <div class="field" style="grid-column:1 / -1">
+            <label>Descrição</label>
+            <textarea id="fDesc" placeholder="Estado do carro, itens, documentação..."></textarea>
+          </div>
+
+          <!-- Fotos -->
+          <div class="field" style="grid-column:1 / -1">
+            <label>Fotos (upload) — pode selecionar várias</label>
+            <input id="fImages" type="file" accept="image/*" multiple />
+            <div class="hint">Dica: fotos grandes podem estourar o limite do navegador. Se possível, envie reduzidas.</div>
+            <div class="previewRow" id="imgPreview"></div>
+            <div class="adminRow">
+              <button class="btn danger" id="btnClearImages">Remover fotos do anúncio</button>
+            </div>
+          </div>
+
+          <!-- Localização no mapa -->
+          <div class="field" style="grid-column:1 / -1">
+            <label>Localização (mapa)</label>
+            <div class="adminRow">
+              <input id="fAddr" placeholder="Buscar endereço (rua, cidade...)" style="flex:1;min-width:220px" />
+              <button class="btn" id="btnSearchAddr" type="button">Buscar no mapa</button>
+              <button class="btn" id="btnMyLoc" type="button">Usar minha localização</button>
+              <button class="btn" id="btnClearLoc" type="button">Limpar</button>
+            </div>
+            <div class="hint">Você pode clicar no mapa para ajustar o ponto.</div>
+            <div id="map"></div>
+            <div class="adminRow">
+              <input id="fLat" placeholder="Latitude" readonly style="flex:1;min-width:160px" />
+              <input id="fLng" placeholder="Longitude" readonly style="flex:1;min-width:160px" />
+            </div>
+          </div>
+
+          <!-- Parcelamento -->
+          <div class="field" style="grid-column:1 / -1">
+            <label>Opções de parcelamento (simulação)</label>
+            <div class="adminGrid">
+              <div class="field">
+                <label>Entrada (R$)</label>
+                <input id="finEntry" type="number" min="0" step="1" placeholder="Ex.: 5000" />
+              </div>
+              <div class="field">
+                <label>Parcelas</label>
+                <select id="finMonths">
+                  <option value="12">12x</option><option value="18">18x</option><option value="24">24x</option>
+                  <option value="36">36x</option><option value="48">48x</option><option value="60">60x</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Juros ao mês (%)</label>
+                <input id="finRate" type="number" min="0" step="0.01" placeholder="Ex.: 2.49" />
+              </div>
+              <div class="field">
+                <label>Mostrar parcelamento?</label>
+                <select id="finEnabled">
+                  <option value="yes">Sim</option>
+                  <option value="no">Não</option>
+                </select>
+              </div>
+            </div>
+            <div class="adminRow">
+              <button class="btn" id="btnCalcFin" type="button">Calcular parcela</button>
+              <div class="hint" id="finResult">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div style="font-weight:900">Meus anúncios</div>
+        <div class="smallmuted">Clique em “Editar” para alterar. “Excluir” remove.</div>
+        <div class="adminList" id="adminList"></div>
+
+        <div class="divider"></div>
+        <div class="adminRow">
+          <button class="btn" id="btnExport">Exportar JSON (backup)</button>
+          <button class="btn" id="btnImport">Importar JSON</button>
+          <input id="importFile" type="file" accept="application/json" class="hide"/>
+          <button class="btn danger" id="btnWipe">Apagar todos anúncios</button>
+        </div>
+        <div class="smallmuted" id="adminMsg" style="margin-top:8px"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LISTA PÚBLICA -->
+  <section id="results">
+    <div class="grid" id="grid"></div>
+    <div class="empty hide" id="empty">Nenhum carro encontrado com esses filtros.</div>
+  </section>
+
+  <footer class="container">
+    <div style="border-top:1px solid var(--line); padding-top:14px">
+      © <span id="year"></span> AutoVende • ADM + Mapa + Parcelamento
+    </div>
+  </footer>
+</main>
+
+<!-- MODAL DETALHES -->
+<div class="modalOverlay" id="modalOverlay" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modalTop">
+      <div class="left">
+        <div class="mTitle" id="mTitle" style="font-weight:900">Detalhes</div>
+        <div class="mSub" id="mSub" style="font-size:12px;color:var(--muted)">—</div>
+      </div>
+      <button class="x" id="btnClose" aria-label="Fechar">✕</button>
+    </div>
+
+    <div class="modalGrid">
+      <div class="gallery">
+        <div class="bigPic" id="bigPic">
+          <div class="tag" id="mTag">—</div>
+          <div class="tag" id="mCity">—</div>
+        </div>
+        <div class="thumbRow" id="thumbRow"></div>
+
+        <div class="desc" id="mLocBox" style="margin-top:12px"></div>
+      </div>
+
+      <div class="details">
+        <div class="priceBig" id="mPrice">—</div>
+
+        <div class="kv">
+          <div class="item"><div class="k">Ano</div><div class="v" id="mYear">—</div></div>
+          <div class="item"><div class="k">KM</div><div class="v" id="mKm">—</div></div>
+          <div class="item"><div class="k">Câmbio</div><div class="v" id="mGear">—</div></div>
+          <div class="item"><div class="k">Combustível</div><div class="v" id="mFuel">—</div></div>
+          <div class="item"><div class="k">Cor</div><div class="v" id="mColor">—</div></div>
+          <div class="item"><div class="k">Contato</div><div class="v" id="mContact">—</div></div>
+        </div>
+
+        <div class="desc" id="mDesc">—</div>
+
+        <div class="desc" id="mFinBox" style="margin-top:12px"></div>
+
+        <div class="cardActions" style="margin-top:12px">
+          <a class="btn ok small" id="mWhats" href="#" target="_blank" rel="noopener">Chamar no WhatsApp</a>
+          <button class="btn small" id="mCopy">Copiar link</button>
+        </div>
+
+        <div class="smallmuted" style="margin-top:10px" id="mPhone">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ===== CONFIG =====
+  const WHATSAPP_NUMBER = "5599999999999"; // 55 + DDD + numero
+  const ADMIN_PASSWORD = "1234";           // troque a senha
+
+  // ===== STORAGE =====
+  const KEY = "autovende_cars_v2";
+  const KEY_ADM = "autovende_admin_logged";
+
+  // ===== DEFAULT DATA =====
+  const defaultCars = [
+    {
+      id:"fiesta-2009-demo",
+      title:"Ford Fiesta 1.0 Flex",
+      brand:"Ford",
+      year:2009,
+      price:25000,
+      km:168000,
+      city:"Jaboticabal - SP",
+      gear:"Manual",
+      fuel:"Flex",
+      color:"Prata",
+      highlight:"Bom para trabalho",
+      contact:"Eliésio",
+      phone:"(16) 99999-9999",
+      images:[],
+      description:"Carro econômico. Doc ok. Aceito proposta.",
+      location:{ lat:null, lng:null, address:"" },
+      financing:{ enabled:true, entry:5000, months:36, rate:2.49 } // rate em % ao mês
+    }
+  ];
+
+  // ===== HELPERS =====
+  const byId = (id)=>document.getElementById(id);
+  const money = (v)=>Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+  const num = (v)=>Number(v||0).toLocaleString("pt-BR");
+  const escapeHtml = (s)=>String(s??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
+  const uniq = (arr)=>[...new Set(arr)].sort((a,b)=>String(a).localeCompare(String(b),"pt-BR"));
+
+  function slugId(title, year){
+    const base = (title||"carro").toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+      .replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"");
+    return `${base}-${year||"x"}-${Math.random().toString(16).slice(2,6)}`;
+  }
+
+  function loadCars(){
+    const raw = localStorage.getItem(KEY);
+    if(!raw){
+      localStorage.setItem(KEY, JSON.stringify(defaultCars));
+      return [...defaultCars];
+    }
+    try { return JSON.parse(raw) || []; } catch { return []; }
+  }
+  function saveCars(list){ localStorage.setItem(KEY, JSON.stringify(list)); }
+
+  function isAdmin(){ return localStorage.getItem(KEY_ADM) === "1"; }
+  function setAdmin(v){ localStorage.setItem(KEY_ADM, v ? "1" : "0"); }
+
+  // ===== STATE =====
+  let cars = loadCars();
+  let currentCar = null;
+  let editId = null;
+  let pendingImages = [];
+
+  // ===== UI refs (public) =====
+  const grid = byId("grid");
+  const empty = byId("empty");
+  const statCount = byId("statCount");
+  const statAvg = byId("statAvg");
+  const statMin = byId("statMin");
+  const statMax = byId("statMax");
+
+  const q = byId("q");
+  const brand = byId("brand");
+  const yearMin = byId("yearMin");
+  const yearMax = byId("yearMax");
+  const priceMax = byId("priceMax");
+  const sort = byId("sort");
+
+  // ===== UI refs (modal) =====
+  const modalOverlay = byId("modalOverlay");
+  const btnClose = byId("btnClose");
+  const mTitle = byId("mTitle");
+  const mSub = byId("mSub");
+  const mPrice = byId("mPrice");
+  const mTag = byId("mTag");
+  const mCity = byId("mCity");
+  const mYear = byId("mYear");
+  const mKm = byId("mKm");
+  const mGear = byId("mGear");
+  const mFuel = byId("mFuel");
+  const mColor = byId("mColor");
+  const mContact = byId("mContact");
+  const mDesc = byId("mDesc");
+  const mWhats = byId("mWhats");
+  const mCopy = byId("mCopy");
+  const mPhone = byId("mPhone");
+  const bigPic = byId("bigPic");
+  const thumbRow = byId("thumbRow");
+  const mLocBox = byId("mLocBox");
+  const mFinBox = byId("mFinBox");
+
+  // ===== UI refs (admin) =====
+  const adminWrap = byId("adminWrap");
+  const loginBox = byId("loginBox");
+  const formBox = byId("formBox");
+  const admPass = byId("admPass");
+  const loginMsg = byId("loginMsg");
+  const adminMsg = byId("adminMsg");
+  const adminList = byId("adminList");
+
+  // form fields
+  const fTitle = byId("fTitle");
+  const fBrand = byId("fBrand");
+  const fYear = byId("fYear");
+  const fPrice = byId("fPrice");
+  const fKm = byId("fKm");
+  const fCity = byId("fCity");
+  const fGear = byId("fGear");
+  const fFuel = byId("fFuel");
+  const fColor = byId("fColor");
+  const fHighlight = byId("fHighlight");
+  const fContact = byId("fContact");
+  const fPhone = byId("fPhone");
+  const fDesc = byId("fDesc");
+  const fImages = byId("fImages");
+  const imgPreview = byId("imgPreview");
+
+  // map fields
+  const fAddr = byId("fAddr");
+  const fLat = byId("fLat");
+  const fLng = byId("fLng");
+  const btnSearchAddr = byId("btnSearchAddr");
+  const btnMyLoc = byId("btnMyLoc");
+  const btnClearLoc = byId("btnClearLoc");
+
+  // financing fields
+  const finEntry = byId("finEntry");
+  const finMonths = byId("finMonths");
+  const finRate = byId("finRate");
+  const finEnabled = byId("finEnabled");
+  const btnCalcFin = byId("btnCalcFin");
+  const finResult = byId("finResult");
+
+  // ===== YEARS DROPDOWN (ADM) =====
+  function buildYearSelect(){
+    const now = new Date().getFullYear();
+    const start = 1980;
+    const end = now + 1;
+    fYear.innerHTML = "";
+    for(let y=end; y>=start; y--){
+      const opt = document.createElement("option");
+      opt.value = String(y);
+      opt.textContent = String(y);
+      fYear.appendChild(opt);
+    }
+  }
+
+  // ===== FILTER OPTIONS (PUBLIC) =====
+  function yearsRange(){
+    const ys = cars.map(c=>c.year).filter(Boolean);
+    const min = ys.length ? Math.min(...ys) : 2000;
+    const max = ys.length ? Math.max(...ys) : new Date().getFullYear();
+    const out = [];
+    for(let y=max; y>=min; y--) out.push(y);
+    return out;
+  }
+  function rebuildFilterOptions(){
+    brand.innerHTML = `<option value="">Todas</option>`;
+    uniq(cars.map(c=>c.brand).filter(Boolean)).forEach(b=>{
+      const opt = document.createElement("option");
+      opt.value = b; opt.textContent = b;
+      brand.appendChild(opt);
+    });
+
+    yearMin.innerHTML = `<option value="">—</option>`;
+    yearMax.innerHTML = `<option value="">—</option>`;
+    yearsRange().forEach(y=>{
+      const o1 = document.createElement("option");
+      o1.value = y; o1.textContent = y; yearMin.appendChild(o1);
+      const o2 = document.createElement("option");
+      o2.value = y; o2.textContent = y; yearMax.appendChild(o2);
+    });
+  }
+
+  // ===== PUBLIC FILTERS =====
+  function applyFilters(){
+    const text = q.value.trim().toLowerCase();
+    const b = brand.value;
+    const yMin = yearMin.value ? Number(yearMin.value) : null;
+    const yMax = yearMax.value ? Number(yearMax.value) : null;
+    const pMax = priceMax.value ? Number(priceMax.value) : null;
+
+    let list = cars.filter(c=>{
+      const hay = `${c.title} ${c.brand} ${c.city} ${c.year} ${c.fuel} ${c.gear} ${c.color}`.toLowerCase();
+      if(text && !hay.includes(text)) return false;
+      if(b && c.brand !== b) return false;
+      if(yMin !== null && c.year < yMin) return false;
+      if(yMax !== null && c.year > yMax) return false;
+      if(pMax !== null && c.price > pMax) return false;
+      return true;
+    });
+
+    const s = sort.value;
+    list.sort((a,b)=>{
+      if(s==="newest") return (b.year||0) - (a.year||0);
+      if(s==="oldest") return (a.year||0) - (b.year||0);
+      if(s==="lowprice") return (a.price||0) - (b.price||0);
+      if(s==="highprice") return (b.price||0) - (a.price||0);
+      if(s==="lowkm") return (a.km||0) - (b.km||0);
+      return 0;
+    });
+
+    render(list);
+    updateStats(list);
+  }
+
+  function render(list){
+    grid.innerHTML = "";
+    empty.classList.toggle("hide", !!list.length);
+
+    list.forEach(c=>{
+      const card = document.createElement("article");
+      card.className = "card";
+
+      const cover = c.images && c.images.length ? c.images[0] : null;
+      const thumb = document.createElement("div");
+      thumb.className = "thumb";
+      if(cover){
+        thumb.style.backgroundImage = `linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55)), url('${cover}')`;
+      }
+      thumb.innerHTML = `
+        <span class="pill">${escapeHtml(c.highlight || "Anúncio")}</span>
+        <span class="pill">${c.financing?.enabled ? "Tem parcelamento" : (c.images?.length ? `${c.images.length} foto(s)` : "sem fotos")}</span>
+      `;
+
+      const body = document.createElement("div");
+      body.className = "cardBody";
+      body.innerHTML = `
+        <div class="titleRow">
+          <div class="title">${escapeHtml(c.title || "Sem título")}</div>
+          <div class="price">${money(c.price)}</div>
+        </div>
+        <div class="meta">
+          <span class="chip">${escapeHtml(c.brand || "—")}</span>
+          <span class="chip">${escapeHtml(c.year ?? "—")}</span>
+          <span class="chip">${num(c.km)} km</span>
+          <span class="chip">${escapeHtml(c.city || "—")}</span>
+        </div>
+      `;
+
+      const actions = document.createElement("div");
+      actions.className = "cardActions";
+
+      const btnDetails = document.createElement("button");
+      btnDetails.className = "btn small";
+      btnDetails.textContent = "Detalhes";
+      btnDetails.onclick = ()=>openModal(c.id);
+
+      const btnW = document.createElement("button");
+      btnW.className = "btn ok small";
+      btnW.textContent = "WhatsApp";
+      btnW.onclick = ()=>openWhats(c);
+
+      actions.append(btnDetails, btnW);
+      body.appendChild(actions);
+
+      card.append(thumb, body);
+      grid.appendChild(card);
+    });
+  }
+
+  function updateStats(list){
+    statCount.textContent = list.length;
+    if(!list.length){ statAvg.textContent=statMin.textContent=statMax.textContent="—"; return; }
+    const prices = list.map(c=>Number(c.price||0)).filter(v=>v>0);
+    if(!prices.length){ statAvg.textContent=statMin.textContent=statMax.textContent="—"; return; }
+    const avg = prices.reduce((a,b)=>a+b,0)/prices.length;
+    statAvg.textContent = money(Math.round(avg));
+    statMin.textContent = money(Math.min(...prices));
+    statMax.textContent = money(Math.max(...prices));
+  }
+
+  // ===== FINANCING (PMT) =====
+  // taxa ao mês em % => i = taxa/100
+  function calcInstallment(total, entry, months, ratePercent){
+    const P = Math.max(0, Number(total||0) - Number(entry||0));
+    const n = Math.max(1, Number(months||1));
+    const i = Math.max(0, Number(ratePercent||0))/100;
+
+    if(P <= 0) return { installment: 0, financed: 0, totalPaid: Number(entry||0) };
+    if(i === 0){
+      const inst = P / n;
+      return { installment: inst, financed: P, totalPaid: P + Number(entry||0) };
+    }
+    const inst = (P * i) / (1 - Math.pow(1+i, -n));
+    return { installment: inst, financed: P, totalPaid: (inst*n) + Number(entry||0) };
+  }
+
+  function renderFinancingText(fin, price){
+    if(!fin?.enabled) return "";
+    const entry = Number(fin.entry||0);
+    const months = Number(fin.months||0);
+    const rate = Number(fin.rate||0);
+    const r = calcInstallment(price, entry, months, rate);
+
+    return `
+      <div style="font-weight:900;margin-bottom:6px">Parcelamento (simulação)</div>
+      <div class="smallmuted">Entrada: <b>${money(entry)}</b> • ${months}x • Juros: ${rate.toFixed(2)}% a.m.</div>
+      <div style="margin-top:8px;font-weight:900">≈ ${months}x de ${money(r.installment)}</div>
+      <div class="smallmuted">Financiado: ${money(r.financed)} • Total estimado: ${money(r.totalPaid)}</div>
+    `;
+  }
+
+  // ===== MODAL =====
+  function openModal(id){
+    const c = cars.find(x=>x.id===id);
+    if(!c) return;
+    currentCar = c;
+
+    mTitle.textContent = c.title || "Detalhes";
+    mSub.textContent = `${c.brand||"—"} • ${c.year||"—"} • ${num(c.km)} km • ${c.city||"—"}`;
+    mPrice.textContent = money(c.price);
+    mTag.textContent = c.highlight || "Anúncio";
+    mCity.textContent = c.city || "—";
+    mYear.textContent = c.year || "—";
+    mKm.textContent = `${num(c.km)} km`;
+    mGear.textContent = c.gear || "—";
+    mFuel.textContent = c.fuel || "—";
+    mColor.textContent = c.color || "—";
+    mContact.textContent = c.contact || "—";
+    mPhone.textContent = c.phone ? `Contato: ${c.phone}` : "";
+    mDesc.textContent = c.description || "";
+
+    // Fotos
+    const imgs = (c.images && c.images.length) ? c.images : [];
+    thumbRow.innerHTML = "";
+    if(imgs.length){
+      imgs.forEach((src, idx)=>{
+        const b = document.createElement("button");
+        b.className = "mini" + (idx===0 ? " active":"");
+        b.style.backgroundImage = `url('${src}')`;
+        b.title = `Foto ${idx+1}`;
+        b.onclick = ()=>selectThumb(idx);
+        thumbRow.appendChild(b);
+      });
+      selectThumb(0);
+    }else{
+      bigPic.style.backgroundImage = "";
+      thumbRow.innerHTML = `<div class="smallmuted">Sem fotos neste anúncio.</div>`;
+    }
+
+    // Localização (link para mapa)
+    const lat = c.location?.lat, lng = c.location?.lng, addr = c.location?.address;
+    if(lat && lng){
+      const gm = `https://www.google.com/maps?q=${encodeURIComponent(lat + "," + lng)}`;
+      mLocBox.innerHTML = `
+        <div style="font-weight:900;margin-bottom:6px">Localização</div>
+        <div class="smallmuted">${escapeHtml(addr || "Ponto no mapa")}</div>
+        <div style="margin-top:8px">
+          <a class="btn small" href="${gm}" target="_blank" rel="noopener">Abrir no mapa</a>
+        </div>
+      `;
+    }else{
+      mLocBox.innerHTML = `<div class="smallmuted">Localização não informada.</div>`;
+    }
+
+    // Parcelamento
+    const finHtml = renderFinancingText(c.financing, c.price);
+    mFinBox.innerHTML = finHtml ? finHtml : `<div class="smallmuted">Parcelamento não informado.</div>`;
+
+    mWhats.href = buildWhatsUrl(c);
+    modalOverlay.classList.add("show");
+    modalOverlay.setAttribute("aria-hidden","false");
+    history.replaceState(null,"",`#${encodeURIComponent(c.id)}`);
+  }
+
+  function selectThumb(idx){
+    const imgs = currentCar?.images || [];
+    [...thumbRow.querySelectorAll(".mini")].forEach((el,i)=>el.classList.toggle("active", i===idx));
+    bigPic.style.backgroundImage = `linear-gradient(180deg, rgba(0,0,0,.10), rgba(0,0,0,.55)), url('${imgs[idx]}')`;
+  }
+
+  function closeModal(){
+    modalOverlay.classList.remove("show");
+    modalOverlay.setAttribute("aria-hidden","true");
+    currentCar = null;
+    history.replaceState(null,"",location.pathname + location.search);
+  }
+
+  // ===== WHATS =====
+  function buildWhatsUrl(car){
+    let msg =
+`Olá! Tenho interesse no anúncio:
+${car.title}
+Ano: ${car.year} | KM: ${car.km}
+Preço: ${money(car.price)}
+Cidade: ${car.city}`;
+
+    if(car.financing?.enabled){
+      const r = calcInstallment(car.price, car.financing.entry, car.financing.months, car.financing.rate);
+      msg += `\n\nParcelamento (simulação): ${car.financing.months}x de ${money(r.installment)} (entrada ${money(car.financing.entry)})`;
+    }
+
+    msg += `\n\nAinda está disponível?`;
+    return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
+  }
+  function openWhats(car){ window.open(buildWhatsUrl(car), "_blank", "noopener"); }
+
+  // ===== ADMIN =====
+  function showAdmin(){
+    adminWrap.classList.remove("hide");
+    window.scrollTo({top: adminWrap.offsetTop - 80, behavior:"smooth"});
+    if(isAdmin()){
+      loginBox.classList.add("hide");
+      formBox.classList.remove("hide");
+      renderAdminList();
+      ensureMapReady();
+      if(!editId) clearForm();
+    }else{
+      loginBox.classList.remove("hide");
+      formBox.classList.add("hide");
+      loginMsg.textContent = "";
+      admPass.value = "";
+      admPass.focus();
+    }
+  }
+  function hideAdmin(){ adminWrap.classList.add("hide"); }
+
+  function renderAdminList(){
+    adminList.innerHTML = "";
+    if(!cars.length){
+      adminList.innerHTML = `<div class="empty">Nenhum anúncio cadastrado.</div>`;
+      return;
+    }
+    cars.slice().sort((a,b)=>(b.year||0)-(a.year||0)).forEach(c=>{
+      const row = document.createElement("div");
+      row.className = "adminItem";
+      row.innerHTML = `
+        <div class="left">
+          <div style="font-weight:900">${escapeHtml(c.title||"Sem título")}</div>
+          <div class="smallmuted">${escapeHtml(c.brand||"—")} • ${c.year||"—"} • ${money(c.price)} • ${escapeHtml(c.city||"—")}</div>
+          <div class="smallmuted">${c.images?.length ? `${c.images.length} foto(s)` : "sem fotos"} • ${c.financing?.enabled ? "parcelamento: sim" : "parcelamento: não"}</div>
+        </div>
+        <div class="adminRow">
+          <button class="btn small" data-edit="${c.id}">Editar</button>
+          <button class="btn danger small" data-del="${c.id}">Excluir</button>
+        </div>
+      `;
+      adminList.appendChild(row);
+    });
+
+    adminList.querySelectorAll("[data-edit]").forEach(btn=>{
+      btn.onclick = ()=>loadToForm(btn.getAttribute("data-edit"));
+    });
+    adminList.querySelectorAll("[data-del]").forEach(btn=>{
+      btn.onclick = ()=>deleteCar(btn.getAttribute("data-del"));
+    });
+  }
+
+  function clearForm(){
+    editId = null;
+    pendingImages = [];
+    imgPreview.innerHTML = "";
+    fImages.value = "";
+
+    fTitle.value = "";
+    fBrand.value = "";
+    fYear.value = String(new Date().getFullYear());
+    fPrice.value = "";
+    fKm.value = "";
+    fCity.value = "";
+    fGear.value = "Manual";
+    fFuel.value = "Flex";
+    fColor.value = "";
+    fHighlight.value = "";
+    fContact.value = "";
+    fPhone.value = "";
+    fDesc.value = "";
+
+    // location
+    fAddr.value = "";
+    fLat.value = "";
+    fLng.value = "";
+    setMapPoint(null, null, "", true);
+
+    // financing
+    finEnabled.value = "yes";
+    finEntry.value = "";
+    finMonths.value = "36";
+    finRate.value = "2.49";
+    finResult.textContent = "—";
+
+    adminMsg.textContent = "Modo: novo anúncio.";
+  }
+
+  function loadToForm(id){
+    const c = cars.find(x=>x.id===id);
+    if(!c) return;
+
+    editId = c.id;
+    pendingImages = (c.images || []).slice();
+    fImages.value = "";
+
+    fTitle.value = c.title || "";
+    fBrand.value = c.brand || "";
+    fYear.value = String(c.year || new Date().getFullYear());
+    fPrice.value = c.price || "";
+    fKm.value = c.km || "";
+    fCity.value = c.city || "";
+    fGear.value = c.gear || "Manual";
+    fFuel.value = c.fuel || "Flex";
+    fColor.value = c.color || "";
+    fHighlight.value = c.highlight || "";
+    fContact.value = c.contact || "";
+    fPhone.value = c.phone || "";
+    fDesc.value = c.description || "";
+
+    // location
+    fAddr.value = c.location?.address || "";
+    fLat.value = c.location?.lat ?? "";
+    fLng.value = c.location?.lng ?? "";
+    ensureMapReady();
+    setMapPoint(c.location?.lat, c.location?.lng, c.location?.address || "", true);
+
+    // financing
+    finEnabled.value = (c.financing?.enabled ? "yes" : "no");
+    finEntry.value = c.financing?.entry ?? "";
+    finMonths.value = String(c.financing?.months ?? "36");
+    finRate.value = String(c.financing?.rate ?? "2.49");
+    finResult.textContent = "—";
+
+    renderImagePreview();
+    adminMsg.textContent = `Editando: ${c.title}`;
+    window.scrollTo({top: adminWrap.offsetTop - 80, behavior:"smooth"});
+  }
+
+  function renderImagePreview(){
+    imgPreview.innerHTML = "";
+    if(!pendingImages.length){
+      imgPreview.innerHTML = `<div class="smallmuted">Sem fotos no anúncio.</div>`;
+      return;
+    }
+    pendingImages.forEach(src=>{
+      const d = document.createElement("div");
+      d.className = "previewImg";
+      d.style.backgroundImage = `url('${src}')`;
+      imgPreview.appendChild(d);
+    });
+  }
+
+  async function filesToBase64(files){
+    const list = [];
+    for(const f of files){
+      if(f.size > 3.5 * 1024 * 1024){
+        alert(`A foto "${f.name}" é muito grande. Tente reduzir para ~3MB.`);
+        continue;
+      }
+      const b64 = await new Promise((resolve,reject)=>{
+        const r = new FileReader();
+        r.onload = ()=>resolve(r.result);
+        r.onerror = reject;
+        r.readAsDataURL(f);
+      });
+      list.push(b64);
+    }
+    return list;
+  }
+
+  function validateForm(){
+    const year = Number(fYear.value||0);
+    const price = Number(fPrice.value||0);
+    if(!fTitle.value.trim()) return "Título é obrigatório.";
+    if(!fBrand.value.trim()) return "Marca é obrigatória.";
+    if(!year || year < 1960 || year > 2101) return "Ano inválido.";
+    if(!price || price < 0) return "Preço inválido.";
+    return null;
+  }
+
+  function saveFromForm(){
+    const err = validateForm();
+    if(err){ alert(err); return; }
+
+    const locLat = fLat.value ? Number(fLat.value) : null;
+    const locLng = fLng.value ? Number(fLng.value) : null;
+
+    const finOn = (finEnabled.value === "yes");
+    const finObj = {
+      enabled: finOn,
+      entry: Number(finEntry.value||0),
+      months: Number(finMonths.value||0),
+      rate: Number(finRate.value||0)
+    };
+
+    const obj = {
+      id: editId || slugId(fTitle.value, fYear.value),
+      title: fTitle.value.trim(),
+      brand: fBrand.value.trim(),
+      year: Number(fYear.value),
+      price: Number(fPrice.value),
+      km: Number(fKm.value||0),
+      city: fCity.value.trim(),
+      gear: fGear.value,
+      fuel: fFuel.value,
+      color: fColor.value.trim(),
+      highlight: fHighlight.value.trim(),
+      contact: fContact.value.trim(),
+      phone: fPhone.value.trim(),
+      images: pendingImages.slice(),
+      description: fDesc.value.trim(),
+      location: { lat: locLat, lng: locLng, address: (fAddr.value||"").trim() },
+      financing: finObj
+    };
+
+    const idx = cars.findIndex(x=>x.id===obj.id);
+    if(idx>=0) cars[idx] = obj;
+    else cars.unshift(obj);
+
+    saveCars(cars);
+    rebuildFilterOptions();
+    applyFilters();
+    renderAdminList();
+
+    adminMsg.textContent = "Salvo com sucesso!";
+  }
+
+  function deleteCar(id){
+    const c = cars.find(x=>x.id===id);
+    if(!c) return;
+    if(!confirm(`Excluir anúncio "${c.title}"?`)) return;
+    cars = cars.filter(x=>x.id!==id);
+    saveCars(cars);
+    rebuildFilterOptions();
+    applyFilters();
+    renderAdminList();
+    if(editId===id) clearForm();
+    adminMsg.textContent = "Anúncio excluído.";
+  }
+
+  // ===== BACKUP/IMPORT =====
+  function exportJson(){
+    const data = JSON.stringify(cars, null, 2);
+    const blob = new Blob([data], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "autovende_backup.json";
+    a.click();
+    URL.revokeObjectURL(url);
+    adminMsg.textContent = "Backup exportado.";
+  }
+
+  function importJsonFile(file){
+    const r = new FileReader();
+    r.onload = ()=>{
+      try{
+        const parsed = JSON.parse(String(r.result||"[]"));
+        if(!Array.isArray(parsed)) throw new Error("Formato inválido");
+        cars = parsed.map(x=>({
+          id: x.id || slugId(x.title, x.year),
+          title: x.title||"",
+          brand: x.brand||"",
+          year: Number(x.year||0),
+          price: Number(x.price||0),
+          km: Number(x.km||0),
+          city: x.city||"",
+          gear: x.gear||"Manual",
+          fuel: x.fuel||"Flex",
+          color: x.color||"",
+          highlight: x.highlight||"",
+          contact: x.contact||"",
+          phone: x.phone||"",
+          images: Array.isArray(x.images) ? x.images : [],
+          description: x.description||"",
+          location: x.location || {lat:null,lng:null,address:""},
+          financing: x.financing || {enabled:false,entry:0,months:12,rate:0}
+        }));
+        saveCars(cars);
+        rebuildFilterOptions();
+        applyFilters();
+        renderAdminList();
+        adminMsg.textContent = "Importado com sucesso!";
+      }catch(e){
+        alert("Falha ao importar: arquivo inválido.");
+      }
+    };
+    r.readAsText(file);
+  }
+
+  // ===== MAP (Leaflet + Nominatim) =====
+  let map = null;
+  let marker = null;
+
+  function ensureMapReady(){
+    if(map) return;
+
+    // fallback center (Brasil)
+    const center = [-15.78, -47.93];
+
+    map = L.map("map").setView(center, 4);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap"
+    }).addTo(map);
+
+    map.on("click", (e)=>{
+      setMapPoint(e.latlng.lat, e.latlng.lng, fAddr.value || "", false);
+    });
+  }
+
+  function setMapPoint(lat, lng, address, fit){
+    if(!map) return;
+    if(lat == null || lng == null){
+      if(marker){ map.removeLayer(marker); marker=null; }
+      fLat.value = "";
+      fLng.value = "";
+      return;
+    }
+    fLat.value = String(lat.toFixed(6));
+    fLng.value = String(lng.toFixed(6));
+    if(address != null) fAddr.value = address;
+
+    if(!marker){
+      marker = L.marker([lat,lng], {draggable:true}).addTo(map);
+      marker.on("dragend", ()=>{
+        const p = marker.getLatLng();
+        setMapPoint(p.lat, p.lng, fAddr.value || "", false);
+      });
+    } else {
+      marker.setLatLng([lat,lng]);
+    }
+
+    if(fit){
+      map.setView([lat,lng], 15);
+    }
+  }
+
+  async function searchAddress(){
+    const q = (fAddr.value||"").trim();
+    if(!q) return alert("Digite um endereço para buscar.");
+    // Nominatim (OpenStreetMap) - busca simples
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`;
+    try{
+      const res = await fetch(url, { headers: { "Accept":"application/json" }});
+      const data = await res.json();
+      if(!data?.length) return alert("Endereço não encontrado. Tente um texto mais completo.");
+      const lat = Number(data[0].lat);
+      const lng = Number(data[0].lon);
+      const display = data[0].display_name || q;
+      setMapPoint(lat, lng, display, true);
+    }catch{
+      alert("Falha ao buscar endereço. Verifique sua internet.");
+    }
+  }
+
+  function useMyLocation(){
+    if(!navigator.geolocation) return alert("Geolocalização não disponível neste navegador.");
+    navigator.geolocation.getCurrentPosition(
+      (pos)=>{
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setMapPoint(lat, lng, fAddr.value || "Minha localização", true);
+      },
+      ()=> alert("Não consegui obter sua localização. Permita o acesso ao GPS/localização.")
+    );
+  }
+
+  // ===== FINANCE UI =====
+  function calcFinFromForm(){
+    const price = Number(fPrice.value||0);
+    const enabled = (finEnabled.value === "yes");
+    if(!enabled){
+      finResult.textContent = "Parcelamento desativado para este anúncio.";
+      return;
+    }
+    const entry = Number(finEntry.value||0);
+    const months = Number(finMonths.value||0);
+    const rate = Number(finRate.value||0);
+    const r = calcInstallment(price, entry, months, rate);
+
+    finResult.textContent = price
+      ? `≈ ${months}x de ${money(r.installment)} (entrada ${money(entry)} • juros ${rate.toFixed(2)}% a.m.)`
+      : "Preencha o preço para calcular.";
+  }
+
+  // ===== MISC =====
+  function init(){
+    byId("year").textContent = new Date().getFullYear();
+    buildYearSelect();
+    rebuildFilterOptions();
+    applyFilters();
+
+    // open modal from hash
+    const id = decodeURIComponent((location.hash||"").replace("#",""));
+    if(id && cars.some(c=>c.id===id)) openModal(id);
+
+    if(isAdmin()){
+      loginBox.classList.add("hide");
+      formBox.classList.remove("hide");
+      ensureMapReady();
+      clearForm();
+      renderAdminList();
+    }else{
+      clearForm();
+    }
+  }
+
+  // ===== EVENTS =====
+  [q, brand, yearMin, yearMax, priceMax, sort].forEach(el=>{
+    el.addEventListener("input", applyFilters);
+    el.addEventListener("change", applyFilters);
+  });
+
+  byId("btnReset").onclick = ()=>{
+    q.value=""; brand.value=""; yearMin.value=""; yearMax.value=""; priceMax.value=""; sort.value="newest";
+    applyFilters();
+  };
+
+  byId("btnWhats").onclick = ()=>{
+    const msg = "Olá! Quero anunciar meu carro. Como funciona?";
+    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
+  };
+
+  byId("btnGoAdmin").onclick = showAdmin;
+  byId("btnExitAdmin").onclick = hideAdmin;
+
+  byId("btnLogin").onclick = ()=>{
+    if(admPass.value === ADMIN_PASSWORD){
+      setAdmin(true);
+      loginMsg.textContent = "";
+      loginBox.classList.add("hide");
+      formBox.classList.remove("hide");
+      ensureMapReady();
+      clearForm();
+      renderAdminList();
+      adminMsg.textContent = "Logado!";
+    }else{
+      loginMsg.textContent = "Senha incorreta.";
+    }
+  };
+
+  byId("btnLogout").onclick = ()=>{
+    setAdmin(false);
+    loginBox.classList.remove("hide");
+    formBox.classList.add("hide");
+    loginMsg.textContent = "Você saiu do ADM.";
+  };
+
+  byId("btnNew").onclick = clearForm;
+  byId("btnSave").onclick = saveFromForm;
+
+  byId("btnClearImages").onclick = ()=>{
+    if(!confirm("Remover todas as fotos deste anúncio?")) return;
+    pendingImages = [];
+    renderImagePreview();
+  };
+
+  fImages.addEventListener("change", async ()=>{
+    const files = [...(fImages.files||[])];
+    if(!files.length) return;
+    const b64s = await filesToBase64(files);
+    pendingImages = pendingImages.concat(b64s);
+    renderImagePreview();
+    fImages.value = "";
+  });
+
+  // Map events
+  btnSearchAddr.onclick = searchAddress;
+  btnMyLoc.onclick = useMyLocation;
+  btnClearLoc.onclick = ()=> setMapPoint(null, null, "", true);
+
+  // Financing events
+  btnCalcFin.onclick = calcFinFromForm;
+  [fPrice, finEntry, finMonths, finRate, finEnabled].forEach(el=>{
+    el.addEventListener("input", ()=>{ /* recalcula leve */ calcFinFromForm(); });
+    el.addEventListener("change", ()=>{ calcFinFromForm(); });
+  });
+
+  // Backup/Import
+  byId("btnExport").onclick = exportJson;
+  byId("btnImport").onclick = ()=> byId("importFile").click();
+  byId("importFile").addEventListener("change", (e)=>{
+    const file = e.target.files?.[0];
+    if(file) importJsonFile(file);
+    e.target.value = "";
+  });
+
+  byId("btnWipe").onclick = ()=>{
+    if(!confirm("Apagar TODOS os anúncios? Isso não tem volta.")) return;
+    cars = [];
+    saveCars(cars);
+    rebuildFilterOptions();
+    applyFilters();
+    renderAdminList();
+    clearForm();
+    adminMsg.textContent = "Tudo apagado.";
+  };
+
+  btnClose.onclick = closeModal;
+  modalOverlay.addEventListener("click",(e)=>{ if(e.target===modalOverlay) closeModal(); });
+  window.addEventListener("keydown",(e)=>{ if(e.key==="Escape" && modalOverlay.classList.contains("show")) closeModal(); });
+
+  mCopy.onclick = async ()=>{
+    if(!currentCar) return;
+    const link = location.origin + location.pathname + "#" + encodeURIComponent(currentCar.id);
+    try{
+      await navigator.clipboard.writeText(link);
+      mCopy.textContent = "Copiado!";
+      setTimeout(()=>mCopy.textContent="Copiar link", 1200);
+    }catch{
+      alert("Copie manualmente: " + link);
+    }
+  };
+
+  window.addEventListener("hashchange", ()=>{
+    const id = decodeURIComponent((location.hash||"").replace("#",""));
+    if(id && cars.some(c=>c.id===id)) openModal(id);
+  });
+
+  init();
+</script>
+</body>
+</html>
