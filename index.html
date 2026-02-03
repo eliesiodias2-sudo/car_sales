@@ -89,15 +89,16 @@
     .modal{width:min(980px,100%);border-radius:24px;border:1px solid rgba(255,255,255,.14);background:linear-gradient(180deg, rgba(15,23,51,.98), rgba(9,12,26,.98));box-shadow:0 30px 90px rgba(0,0,0,.55);overflow:hidden}
     .modalTop{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
     .x{width:40px;height:40px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.04);cursor:pointer;font-weight:900;color:var(--text)}
-    .gallery::-webkit-scrollbar,
-.details::-webkit-scrollbar {
-  width: 8px;
+    .modalGrid{
+  display:grid;
+  grid-template-columns:1.2fr .8fr;
+  gap:0;
+  height:80vh; /* limita a altura da modal e habilita rolagem interna */
 }
 
-.gallery::-webkit-scrollbar-thumb,
-.details::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.15);
-  border-radius: 4px;
+.gallery, .details {
+  overflow-y:auto; /* permite rolar o conteúdo */
+  padding-right:8px; /* evita esconder conteúdo atrás da scrollbar */
 }
 
     @media (max-width: 920px){ .modalGrid{grid-template-columns:1fr} }
